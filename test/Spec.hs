@@ -19,7 +19,17 @@ main = hspec $ do
     it "return 40-15 when Player A makes three winning strikes and Player B makes one winning strike" $
       scoreOfGame [A, A, B, A] `shouldBe` Match (Quarante, Quinze) (Set 0 0)
 
-    -- usecase deuce and advantages
+    it "return 40-40" $
+      scoreOfGame [A, A, A, B, B, B] `shouldBe` Match (Quarante, Quarante) (Set 0 0)
+
+    it "return Avantage A" $
+      scoreOfGame [A, A, A, B, B, B, A] `shouldBe` Match (Avantage, Quarante) (Set 0 0)
+
+    it "return Avantage A after a few deuces" $
+      scoreOfGame [A, A, A, B, B, B, A, B, B, A, A] `shouldBe` Match (Avantage, Quarante) (Set 0 0)
+
+    it "return A wins the point after avantage" $
+      scoreOfGame [A, A, A, B, B, B, A, A] `shouldBe` Match (Zero, Zero) (Set 1 0)
 
     it "gives one point to player A if he makes 4 winning hits  in the game" $
       scoreOfGame [A, A, A, A] `shouldBe` Match (Zero, Zero) (Set 1 0)
@@ -57,13 +67,13 @@ main = hspec $ do
   -- Use case first set is finished, onto the second one
 
 
-data ScoreJeu = Zero | Quinze | Trente | Quarante deriving (Show, Eq, Enum)
+data ScoreJeu = Zero | Quinze | Trente | Quarante | Avantage deriving (Show, Eq, Enum)
 data Set = Set Integer Integer deriving (Show, Eq)
 data Match = Match (ScoreJeu, ScoreJeu) Set deriving (Show, Eq)
 
 data Player = A | B deriving (Show, Eq)
 
-{-Pattern matching-}
+-- Pattern matching
 {-score :: [Player] -> (Int, Int)-}
 {-score [] = (0, 0)-}
 {-score [A] = (15, 0)-}
@@ -72,15 +82,28 @@ data Player = A | B deriving (Show, Eq)
 {-score [A, A, B, A] = (40, 15)-}
 {-score [A, B, A, B, A] = (40, 15)-}
 
-{-Recursion + Pattern matching-}
-score :: [Player] -> Match -> Match
-score [] (Match (pointsA, pointsB) (Set jeuxA jeuxB)) = Match (pointsA, pointsB) ( Set jeuxA jeuxB)
-score (A:tail) (Match (Quarante, _) (Set jeuxA jeuxB)) = score tail (Match (Zero, Zero) (Set (jeuxA + 1) jeuxB))
-score (B:tail) (Match (_, Quarante) (Set jeuxA jeuxB)) = score tail (Match (Zero, Zero) (Set jeuxA (jeuxB + 1)))
-score (A:tail) (Match (pointsA, pointsB) (Set jeuxA jeuxB)) = score tail (Match (succ pointsA, pointsB) (Set jeuxA jeuxB))
-score (B:tail) (Match (pointsA, pointsB) (Set jeuxA jeuxB)) = score tail (Match (pointsA, succ pointsB) (Set jeuxA jeuxB))
-
+-- Recursion + Pattern matching
+-- score :: [Player] -> Match -> Match
+-- score [] (Match (pointsA, pointsB) (Set jeuxA jeuxB)) = Match (pointsA, pointsB) (Set jeuxA jeuxB)
+-- score (A:tail) (Match (Quarante, _) (Set jeuxA jeuxB)) = score tail (Match (Zero, Zero) (Set (jeuxA + 1) jeuxB))
+-- score (B:tail) (Match (_, Quarante) (Set jeuxA jeuxB)) = score tail (Match (Zero, Zero) (Set jeuxA (jeuxB + 1)))
+-- score (A:tail) (Match (pointsA, pointsB) (Set jeuxA jeuxB)) = score tail (Match (succ pointsA, pointsB) (Set jeuxA jeuxB))
+-- score (B:tail) (Match (pointsA, pointsB) (Set jeuxA jeuxB)) = score tail (Match (pointsA, succ pointsB) (Set jeuxA jeuxB))
 
 scoreOfGame :: [Player] -> Match
 scoreOfGame hits = score hits (Match (Zero, Zero) (Set 0 0))
 
+-- Recursion + guards + deuce
+score :: [Player] -> Match -> Match
+score [] (Match (pointsA, pointsB) (Set jeuxA jeuxB)) = Match (pointsA, pointsB) (Set jeuxA jeuxB)
+score (A:tail) (Match (pointsA, pointsB) (Set jeuxA jeuxB))
+  | pointsA == Quarante && pointsB == Avantage = score tail (Match (Quarante, Quarante) (Set jeuxA jeuxB))
+  | pointsA == Quarante && pointsB == Quarante = score tail (Match (Avantage, Quarante) (Set jeuxA jeuxB))
+  | pointsA == Avantage || pointsA == Quarante = score tail (Match (Zero, Zero) (Set (jeuxA + 1) jeuxB))
+  | otherwise = score tail (Match (succ pointsA, pointsB) (Set jeuxA jeuxB))
+
+score (B:tail) (Match (pointsA, pointsB) (Set jeuxA jeuxB))
+  | pointsB == Quarante && pointsA == Avantage = score tail (Match (Quarante, Quarante) (Set jeuxA jeuxB))
+  | pointsB == Quarante && pointsA == Quarante = score tail (Match (Quarante, Avantage) (Set jeuxA jeuxB))
+  | pointsB == Avantage || pointsB == Quarante = score tail (Match (Zero, Zero) (Set jeuxA (jeuxB + 1)))
+  | otherwise = score tail (Match (pointsA, succ pointsB) (Set jeuxA jeuxB))
